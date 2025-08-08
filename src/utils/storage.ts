@@ -98,7 +98,7 @@ export const addWinner = (winner: Omit<Winner, 'id' | 'drawDate'>, drawType: Dra
   const winners = getWinners(drawType);
   const newWinner: Winner = {
     ...winner,
-    id: Date.now().toString(),
+    id: crypto.randomUUID(),
     drawDate: new Date(),
     drawType
   };
