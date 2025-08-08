@@ -1,0 +1,92 @@
+[
+  {
+    "name": "Elena Rossi",
+    "department": "International Messaging",
+    "supervisor": "Jane Smith",
+    "tickets": 6
+  },
+  {
+    "name": "Arjun Singh",
+    "department": "India Messaging",
+    "supervisor": "Bob Wilson",
+    "tickets": 8
+  },
+  {
+    "name": "Chen Wei",
+    "department": "APAC",
+    "supervisor": "Sarah Lee",
+    "tickets": 3
+  },
+  {
+    "name": "Isabella Santos",
+    "department": "International Messaging",
+    "supervisor": "Jane Smith",
+    "tickets": 5
+  },
+  {
+    "name": "Vikram Gupta",
+    "department": "India Messaging",
+    "supervisor": "Bob Wilson",
+    "tickets": 7
+  },
+  {
+    "name": "Hiroshi Yamamoto",
+    "department": "APAC",
+    "supervisor": "Sarah Lee",
+    "tickets": 4
+  },
+  {
+    "name": "Ana Rodriguez",
+    "department": "International Messaging",
+    "supervisor": "Jane Smith",
+    "tickets": 9
+  },
+  {
+    "name": "Ravi Kumar",
+    "department": "India Messaging",
+    "supervisor": "Bob Wilson",
+    "tickets": 2
+  },
+  {
+    "name": "Mei Lin",
+    "department": "APAC",
+    "supervisor": "Sarah Lee",
+    "tickets": 6
+  },
+  {
+    "name": "Lucas Silva",
+    "department": "International Messaging",
+    "supervisor": "Jane Smith",
+    "tickets": 3
+  },
+  {
+    "name": "Neha Sharma",
+    "department": "India Messaging",
+    "supervisor": "Bob Wilson",
+    "tickets": 8
+  },
+  {
+    "name": "Kenji Nakamura",
+    "department": "APAC",
+    "supervisor": "Sarah Lee",
+    "tickets": 5
+  },
+  {
+    "name": "Fatima Al-Zahra",
+    "department": "International Messaging",
+    "supervisor": "Jane Smith",
+    "tickets": 7
+  },
+  {
+    "name": "Rohit Mehta",
+    "department": "India Messaging",
+    "supervisor": "Bob Wilson",
+    "tickets": 4
+  },
+  {
+    "name": "Sato Takeshi",
+    "department": "APAC",
+    "supervisor": "Sarah Lee",
+    "tickets": 6
+  }
+]
