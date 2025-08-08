@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import { Dice6, Users, Trophy, Ticket, Sparkles, Play, RotateCcw, Download } from 'lucide-react';
+import { Dice6, Users, Trophy, Ticket, Sparkles, Play, RotateCcw, Download, Settings, Building2 } from 'lucide-react';
 import Layout from '../components/Layout';
 import Navigation from '../components/Navigation';
 import GlassCard from '../components/GlassCard';
-import { getAllContestants, drawWinners, exportToCSV } from '../utils/raffle';
+import { getAllContestants, getContestantsByDepartment, drawWinners, exportToCSV } from '../utils/raffle';
 import { addWinner, getWinners, getWinnersFromSupabase } from '../utils/storage';
-import type { DrawType, Contestant } from '../types';
+import type { DrawType, Contestant, Department } from '../types';
 
 const drawConfigs = [
   {
@@ -30,14 +30,20 @@ const drawConfigs = [
   }
 ];
 
+const departments: Department[] = ['International Messaging', 'India Messaging', 'APAC'];
+
 export default function Raffle() {
   const [selectedDraw, setSelectedDraw] = useState<DrawType>('discovery-70');
   const [winnerCount, setWinnerCount] = useState(1);
+  const [selectedDepartments, setSelectedDepartments] = useState<Department[]>(departments);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentWinners, setCurrentWinners] = useState<Contestant[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [allWinners, setAllWinners] = useState(getWinners());
   const [isLoading, setIsLoading] = useState(false);
+  const [drawingWinner, setDrawingWinner] = useState<Contestant | null>(null);
+  const [winnerIndex, setWinnerIndex] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     const loadWinnersFromSupabase = async () => {
@@ -55,7 +61,19 @@ export default function Raffle() {
     loadWinnersFromSupabase();
   }, []);
 
-  const contestants = getAllContestants(selectedDraw);
+  const getFilteredContestants = () => {
+    if (selectedDepartments.length === departments.length) {
+      return getAllContestants(selectedDraw);
+    }
+    
+    const filtered: Contestant[] = [];
+    selectedDepartments.forEach(dept => {
+      filtered.push(...getContestantsByDepartment(dept, selectedDraw));
+    });
+    return filtered;
+  };
+
+  const contestants = getFilteredContestants();
   const existingWinnerNames = allWinners.map(w => w.name);
   const availableContestants = contestants.filter(c => !existingWinnerNames.includes(c.name));
   const totalTickets = contestants.reduce((sum, c) => sum + c.tickets, 0);
@@ -111,29 +129,63 @@ export default function Raffle() {
     setIsDrawing(true);
     setShowResults(false);
     setCurrentWinners([]);
+    setWinnerIndex(0);
 
-    // Simulate drawing animation
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    const winnersToSelect = drawWinners(
+      availableContestants, 
+      Math.min(winnerCount, availableContestants.length), 
+      existingWinnerNames
+    );
 
-    const winners = drawWinners(availableContestants, Math.min(winnerCount, availableContestants.length), existingWinnerNames);
-    
-    // Save winners to storage and Supabase
-    const savedWinners = winners.map(winner => addWinner(winner, selectedDraw));
-    
-    setCurrentWinners(winners);
+    // Animate each winner selection one by one
+    for (let i = 0; i < winnersToSelect.length; i++) {
+      setWinnerIndex(i + 1);
+      
+      // Show drawing animation for 8 seconds
+      setDrawingWinner(null);
+      
+      // Simulate drawing with random contestants for excitement
+      const animationDuration = 8000; // 8 seconds
+      const intervalTime = 200; // Change every 200ms
+      const intervals = animationDuration / intervalTime;
+      
+      for (let j = 0; j < intervals; j++) {
+        await new Promise(resolve => setTimeout(resolve, intervalTime));
+        const randomContestant = availableContestants[Math.floor(Math.random() * availableContestants.length)];
+        setDrawingWinner(randomContestant);
+      }
+      
+      // Show the actual winner for 2 seconds
+      setDrawingWinner(winnersToSelect[i]);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Add winner to current winners list
+      setCurrentWinners(prev => [...prev, winnersToSelect[i]]);
+      
+      // Trigger confetti for each winner
+      triggerConfetti();
+      
+      // Small pause between winners
+      if (i < winnersToSelect.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    // Save all winners to storage and Supabase
+    const savedWinners = winnersToSelect.map(winner => addWinner(winner, selectedDraw));
     setAllWinners(prev => [...prev, ...savedWinners]);
+    
     setIsDrawing(false);
     setShowResults(true);
-
-    // Trigger confetti after a short delay
-    setTimeout(() => {
-      triggerConfetti();
-    }, 500);
+    setDrawingWinner(null);
+    setWinnerIndex(0);
   };
 
   const handleReset = () => {
     setCurrentWinners([]);
     setShowResults(false);
+    setDrawingWinner(null);
+    setWinnerIndex(0);
   };
 
   const handleExportCurrentWinners = () => {
@@ -145,6 +197,24 @@ export default function Raffle() {
       }));
       exportToCSV(winnersWithMetadata);
     }
+  };
+
+  const handleDepartmentToggle = (department: Department) => {
+    setSelectedDepartments(prev => {
+      if (prev.includes(department)) {
+        return prev.filter(d => d !== department);
+      } else {
+        return [...prev, department];
+      }
+    });
+  };
+
+  const handleSelectAllDepartments = () => {
+    setSelectedDepartments(departments);
+  };
+
+  const handleDeselectAllDepartments = () => {
+    setSelectedDepartments([]);
   };
 
   return (
@@ -170,7 +240,9 @@ export default function Raffle() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {drawConfigs.map((config) => {
-              const configContestants = getAllContestants(config.id);
+              const configContestants = selectedDepartments.length === departments.length 
+                ? getAllContestants(config.id)
+                : selectedDepartments.flatMap(dept => getContestantsByDepartment(dept, config.id));
               const configAvailable = configContestants.filter(c => !existingWinnerNames.includes(c.name));
               const configTotalTickets = configContestants.reduce((sum, c) => sum + c.tickets, 0);
               const configAvailableTickets = configAvailable.reduce((sum, c) => sum + c.tickets, 0);
@@ -225,10 +297,93 @@ export default function Raffle() {
 
         {/* Draw Configuration */}
         <GlassCard className="p-8">
-          <h3 className="text-xl font-bold text-white mb-6 flex items-center">
-            <Sparkles className="w-6 h-6 mr-2" />
-            Draw Configuration - {selectedConfig.name}
-          </h3>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-white flex items-center">
+              <Sparkles className="w-6 h-6 mr-2" />
+              Draw Configuration - {selectedConfig.name}
+            </h3>
+            <motion.button
+              onClick={() => setShowSettings(!showSettings)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-white/20 backdrop-blur-md border border-white/30 text-white hover:bg-white/30 transition-all duration-200"
+            >
+              <Settings className="w-4 h-4" />
+              <span>Settings</span>
+            </motion.button>
+          </div>
+
+          <AnimatePresence>
+            {showSettings && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-6 p-6 rounded-lg bg-white/10 backdrop-blur-md border border-white/20"
+              >
+                <h4 className="text-lg font-bold text-white mb-4 flex items-center">
+                  <Building2 className="w-5 h-5 mr-2" />
+                  Department Selection
+                </h4>
+                
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <motion.button
+                    onClick={handleSelectAllDepartments}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="px-3 py-1 rounded-lg bg-green-500/20 backdrop-blur-md border border-green-400/30 text-green-200 hover:bg-green-500/30 transition-all duration-200 text-sm"
+                  >
+                    Select All
+                  </motion.button>
+                  <motion.button
+                    onClick={handleDeselectAllDepartments}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="px-3 py-1 rounded-lg bg-red-500/20 backdrop-blur-md border border-red-400/30 text-red-200 hover:bg-red-500/30 transition-all duration-200 text-sm"
+                  >
+                    Deselect All
+                  </motion.button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {departments.map((dept) => {
+                    const deptContestants = getContestantsByDepartment(dept, selectedDraw);
+                    const deptAvailable = deptContestants.filter(c => !existingWinnerNames.includes(c.name));
+                    const isSelected = selectedDepartments.includes(dept);
+                    
+                    return (
+                      <motion.div
+                        key={dept}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => handleDepartmentToggle(dept)}
+                        className={`
+                          p-4 rounded-lg cursor-pointer transition-all duration-300 border-2
+                          ${isSelected 
+                            ? `${selectedConfig.bgColor} ${selectedConfig.borderColor} shadow-lg` 
+                            : 'bg-white/10 border-white/20 hover:bg-white/15'
+                          }
+                        `}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="text-white font-medium">{dept}</h5>
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                            isSelected ? 'bg-white border-white' : 'border-white/40'
+                          }`}>
+                            {isSelected && <div className="w-2 h-2 rounded-full bg-gray-800"></div>}
+                          </div>
+                        </div>
+                        <div className="text-sm text-white/70">
+                          <p>{deptAvailable.length} / {deptContestants.length} available</p>
+                          <p>{deptContestants.reduce((sum, c) => sum + c.tickets, 0)} tickets</p>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1">
@@ -257,7 +412,9 @@ export default function Raffle() {
                     <span className="text-white/80 font-medium">Available Pool</span>
                   </div>
                   <p className="text-2xl font-bold text-white">{availableContestants.length}</p>
-                  <p className="text-white/60 text-sm">contestants ready to draw</p>
+                  <p className="text-white/60 text-sm">
+                    from {selectedDepartments.length === departments.length ? 'all' : selectedDepartments.length} dept{selectedDepartments.length !== 1 ? 's' : ''}
+                  </p>
                 </div>
                 
                 <div className={`p-4 rounded-lg ${selectedConfig.bgColor} backdrop-blur-md border ${selectedConfig.borderColor}`}>
@@ -275,12 +432,12 @@ export default function Raffle() {
           <div className="flex flex-col sm:flex-row gap-4 mt-8">
             <motion.button
               onClick={handleDraw}
-              disabled={isDrawing || availableContestants.length === 0}
+              disabled={isDrawing || availableContestants.length === 0 || selectedDepartments.length === 0}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               className={`
                 flex-1 flex items-center justify-center space-x-3 px-6 py-4 rounded-lg font-semibold text-white transition-all duration-200
-                ${availableContestants.length === 0 
+                ${availableContestants.length === 0 || selectedDepartments.length === 0
                   ? 'bg-gray-500/20 border border-gray-400/30 cursor-not-allowed opacity-50' 
                   : `bg-gradient-to-r ${selectedConfig.color} hover:shadow-lg disabled:opacity-50`
                 }
@@ -289,7 +446,7 @@ export default function Raffle() {
               {isDrawing ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <span>Drawing Winners...</span>
+                  <span>Drawing Winner {winnerIndex} of {winnerCount}...</span>
                 </>
               ) : (
                 <>
@@ -314,12 +471,22 @@ export default function Raffle() {
             )}
           </div>
 
-          {availableContestants.length === 0 && (
+          {availableContestants.length === 0 && selectedDepartments.length > 0 && (
             <div className="mt-6 p-4 rounded-lg bg-orange-500/20 backdrop-blur-md border border-orange-400/30">
               <p className="text-orange-200 text-center">
                 <strong>No contestants available for {selectedConfig.name}</strong>
                 <br />
-                All contestants from this pool have already been selected as winners.
+                All contestants from the selected departments have already been selected as winners.
+              </p>
+            </div>
+          )}
+
+          {selectedDepartments.length === 0 && (
+            <div className="mt-6 p-4 rounded-lg bg-red-500/20 backdrop-blur-md border border-red-400/30">
+              <p className="text-red-200 text-center">
+                <strong>No departments selected</strong>
+                <br />
+                Please select at least one department to proceed with the draw.
               </p>
             </div>
           )}
@@ -332,28 +499,54 @@ export default function Raffle() {
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
             >
-              <GlassCard className="p-12 text-center max-w-md mx-4">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 flex items-center justify-center">
-                  <Dice6 className="w-10 h-10 text-white animate-spin" />
+              <GlassCard className="p-12 text-center max-w-lg mx-4">
+                <div className="mb-6">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    className="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 flex items-center justify-center"
+                  >
+                    <Dice6 className="w-12 h-12 text-white" />
+                  </motion.div>
+                  <h3 className="text-3xl font-bold text-white mb-2">
+                    Drawing Winner {winnerIndex} of {winnerCount}
+                  </h3>
+                  <p className="text-white/80 mb-6">Using weighted probability system...</p>
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-2">Drawing Winners</h3>
-                <p className="text-white/80 mb-4">Using weighted probability system...</p>
-                <div className="flex justify-center space-x-1">
+
+                {drawingWinner && (
+                  <motion.div
+                    key={drawingWinner.name}
+                    initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    className={`p-6 rounded-2xl ${selectedConfig.bgColor} backdrop-blur-md border ${selectedConfig.borderColor} mb-6`}
+                  >
+                    <h4 className="text-2xl font-bold text-white mb-2">{drawingWinner.name}</h4>
+                    <p className="text-white/80 text-lg">{drawingWinner.department}</p>
+                    <p className="text-white/60">Supervisor: {drawingWinner.supervisor}</p>
+                    <div className="flex items-center justify-center space-x-2 mt-3">
+                      <Ticket className="w-5 h-5 text-yellow-400" />
+                      <span className="text-yellow-400 font-bold text-lg">{drawingWinner.tickets} tickets</span>
+                    </div>
+                  </motion.div>
+                )}
+
+                <div className="flex justify-center space-x-2">
                   {[0, 1, 2].map((i) => (
                     <motion.div
                       key={i}
                       animate={{
-                        scale: [1, 1.2, 1],
+                        scale: [1, 1.5, 1],
                         opacity: [0.5, 1, 0.5]
                       }}
                       transition={{
-                        duration: 1,
+                        duration: 1.5,
                         repeat: Infinity,
-                        delay: i * 0.2
+                        delay: i * 0.3
                       }}
-                      className="w-3 h-3 bg-white rounded-full"
+                      className="w-4 h-4 bg-white rounded-full"
                     />
                   ))}
                 </div>
@@ -427,6 +620,9 @@ export default function Raffle() {
                     <br />
                     <span className="text-white/60 text-sm">
                       Draw completed on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
+                      {selectedDepartments.length < departments.length && (
+                        <> • Departments: {selectedDepartments.join(', ')}</>
+                      )}
                     </span>
                   </p>
                 </div>
