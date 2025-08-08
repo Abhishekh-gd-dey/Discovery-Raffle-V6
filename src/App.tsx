@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { isAuthenticated } from './utils/auth';
 import LoginForm from './components/LoginForm';
 import Dashboard from './pages/Dashboard';
-import { Raffle } from './pages/Raffle';
+import Raffle from './pages/Raffle';
 import Winners from './pages/Winners';
 import Analytics from './pages/Analytics';
 
