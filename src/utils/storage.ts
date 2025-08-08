@@ -35,6 +35,13 @@ export const getWinners = (drawType?: DrawType): Winner[] => {
 
 export const getWinnersFromSupabase = async (drawType?: DrawType): Promise<Winner[]> => {
   try {
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.warn('User not authenticated, using localStorage fallback');
+      return getWinners(drawType);
+    }
+
     let query = supabase
       .from('winners')
       .select('*')
@@ -74,6 +81,13 @@ export const saveWinners = (winners: Winner[], drawType: DrawType): void => {
 
 export const saveWinnerToSupabase = async (winner: Winner): Promise<void> => {
   try {
+    // Check if user is authenticated, if not, skip Supabase save
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.warn('User not authenticated, skipping Supabase save');
+      return;
+    }
+
     const { error } = await supabase
       .from('winners')
       .insert({
@@ -124,6 +138,13 @@ export const clearWinners = (drawType?: DrawType): void => {
 
 export const clearWinnersFromSupabase = async (drawType?: DrawType): Promise<void> => {
   try {
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.warn('User not authenticated, skipping Supabase clear');
+      return;
+    }
+
     let query = supabase.from('winners').delete();
     
     if (drawType) {
